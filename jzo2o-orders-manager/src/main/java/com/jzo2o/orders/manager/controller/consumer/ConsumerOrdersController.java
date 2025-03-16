@@ -38,6 +38,7 @@ public class ConsumerOrdersController {
     private IOrdersCreateService ordersCreateService;
 
 
+
     @GetMapping("/{id}")
     @ApiOperation("根据订单id查询")
     @ApiImplicitParams({
@@ -79,5 +80,16 @@ public class ConsumerOrdersController {
     })
     public OrdersPayResDTO payResult(@PathVariable("id") Long id) {
         return ordersCreateService.getPayResultFromTradServer(id);
+    }
+
+    @PutMapping("/cancel")
+    @ApiOperation("取消订单")
+    public void cancel(@RequestBody OrderCancelReqDTO orderCancelReqDTO) {
+        OrderCancelDTO orderCancelDTO = BeanUtil.toBean(orderCancelReqDTO, OrderCancelDTO.class);
+        CurrentUserInfo currentUserInfo = UserContext.currentUser();
+        orderCancelDTO.setCurrentUserId(currentUserInfo.getId());
+        orderCancelDTO.setCurrentUserName(currentUserInfo.getName());
+        orderCancelDTO.setCurrentUserType(currentUserInfo.getUserType());
+        ordersManagerService.cancel(orderCancelDTO);
     }
 }

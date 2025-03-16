@@ -2,6 +2,7 @@ package com.jzo2o.orders.manager.service.impl;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import javax.annotation.Resource;
 import javax.swing.plaf.metal.MetalBorders;
 
@@ -247,6 +248,22 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
             throw new CommonException("更新订单"+orders.getId()+"支付成功失败");
         }
 
+    }
+
+    /**
+     * 查询超时订单id列表
+     *
+     * @param count 数量
+     * @return 订单id列表
+     */
+    @Override
+    public List<Orders> queryOverTimePayOrdersListByCount(Integer count) {
+        List<Orders> list = lambdaQuery()
+            .eq(Orders::getPayStatus, OrderPayStatusEnum.NO_PAY.getStatus())
+            .lt(Orders::getCreateTime, LocalDateTime.now().minusMinutes(15))
+            .last("limit " + count)
+            .list();
+        return list;
     }
 
     //生成二维码
