@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.jzo2o.statemachine.core.StateMachineSnapshot;
+
 /**
  * 订单快照
  *
@@ -19,7 +21,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderSnapshotDTO  {
+public class OrderSnapshotDTO extends StateMachineSnapshot {
     /**
      * 订单id
      */
@@ -225,23 +227,23 @@ public class OrderSnapshotDTO  {
     private Integer evaluationStatus;
 
 
-//    @Override
-//    public String getSnapshotId() {
-//        return String.valueOf(id);
-//    }
-//
-//    @Override
-//    public Integer getSnapshotStatus() {
-//        return ordersStatus;
-//    }
-//
-//    @Override
-//    public void setSnapshotId(String snapshotId) {
-//        this.id = Long.parseLong(snapshotId);
-//    }
-//
-//    @Override
-//    public void setSnapshotStatus(Integer snapshotStatus) {
-//        this.ordersStatus = snapshotStatus;
-//    }
+    @Override
+    public String getSnapshotId() {
+        return String.valueOf(id);
+    }
+
+    @Override
+    public Integer getSnapshotStatus() {
+        return ordersStatus;
+    }
+
+    @Override
+    public void setSnapshotId(String snapshotId) {
+        this.id = Long.parseLong(snapshotId);
+    }
+
+    @Override
+    public void setSnapshotStatus(Integer snapshotStatus) {
+        this.ordersStatus = snapshotStatus;
+    }
 }

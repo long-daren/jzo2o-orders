@@ -23,10 +23,13 @@ import com.jzo2o.common.utils.DateUtils;
 import com.jzo2o.common.utils.NumberUtils;
 import com.jzo2o.common.utils.ObjectUtils;
 import com.jzo2o.mvc.utils.UserContext;
+import com.jzo2o.orders.base.config.OrderStateMachine;
 import com.jzo2o.orders.base.enums.OrderPayStatusEnum;
+import com.jzo2o.orders.base.enums.OrderStatusChangeEventEnum;
 import com.jzo2o.orders.base.enums.OrderStatusEnum;
 import com.jzo2o.orders.base.mapper.OrdersMapper;
 import com.jzo2o.orders.base.model.domain.Orders;
+import com.jzo2o.orders.base.model.dto.OrderSnapshotDTO;
 import com.jzo2o.orders.manager.model.dto.request.OrdersPayReqDTO;
 import com.jzo2o.orders.manager.model.dto.request.PlaceOrderReqDTO;
 import com.jzo2o.orders.manager.model.dto.response.OrdersPayResDTO;
@@ -79,6 +82,9 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
     @Resource
     private TradingApi tradingApi;
+
+    @Resource
+    private OrderStateMachine orderStateMachine;
     /**
      * 下单接口
      *
@@ -213,6 +219,7 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
      * @param tradeStatusMsg 交易状态消息
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void paySuccess(TradeStatusMsg tradeStatusMsg) {
         //查询订单
         Orders orders = baseMapper.selectById(tradeStatusMsg.getProductOrderNo());
@@ -233,21 +240,28 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         if (ObjectUtil.isEmpty(tradeStatusMsg.getTransactionId())) {
             throw new CommonException("支付成功通知缺少第三方支付单号");
         }
-        //更新订单的支付状态及第三方交易单号等信息
-        boolean update = lambdaUpdate()
-            .eq(Orders::getId, orders.getId())
-            .set(Orders::getPayTime, LocalDateTime.now())//支付时间
-            .set(Orders::getTradingOrderNo, tradeStatusMsg.getTradingOrderNo())//交易单号
-            .set(Orders::getTradingChannel, tradeStatusMsg.getTradingChannel())//支付渠道
-            .set(Orders::getTransactionId, tradeStatusMsg.getTransactionId())//第三方支付交易号
-            .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())//支付状态
-            .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())//订单状态更新为派单中
-            .update();
-        if(!update){
-            log.info("更新订单:{}支付成功失败", orders.getId());
-            throw new CommonException("更新订单"+orders.getId()+"支付成功失败");
-        }
-
+//        //更新订单的支付状态及第三方交易单号等信息
+//        boolean update = lambdaUpdate()
+//            .eq(Orders::getId, orders.getId())
+//            .set(Orders::getPayTime, LocalDateTime.now())//支付时间
+//            .set(Orders::getTradingOrderNo, tradeStatusMsg.getTradingOrderNo())//交易单号
+//            .set(Orders::getTradingChannel, tradeStatusMsg.getTradingChannel())//支付渠道
+//            .set(Orders::getTransactionId, tradeStatusMsg.getTransactionId())//第三方支付交易号
+//            .set(Orders::getPayStatus, OrderPayStatusEnum.PAY_SUCCESS.getStatus())//支付状态
+//            .set(Orders::getOrdersStatus, OrderStatusEnum.DISPATCHING.getStatus())//订单状态更新为派单中
+//            .update();
+//        if(!update){
+//            log.info("更新订单:{}支付成功失败", orders.getId());
+//            throw new CommonException("更新订单"+orders.getId()+"支付成功失败");
+//        }
+// 修改订单状态和支付状态
+        OrderSnapshotDTO orderSnapshotDTO = OrderSnapshotDTO.builder()
+            .payTime(LocalDateTime.now())
+            .tradingOrderNo(tradeStatusMsg.getTradingOrderNo())
+            .tradingChannel(tradeStatusMsg.getTradingChannel())
+            .thirdOrderId(tradeStatusMsg.getTransactionId())
+            .build();
+        orderStateMachine.changeStatus(orders.getUserId(),String.valueOf(orders.getId()), OrderStatusChangeEventEnum.PAYED, orderSnapshotDTO);
     }
 
     /**
@@ -321,5 +335,9 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         if (!save) {
             throw new CommonException("下单失败");
         }
+        //构建快照对象
+        OrderSnapshotDTO orderSnapshotDTO = BeanUtil.toBean(baseMapper.selectById(orders.getId()), OrderSnapshotDTO.class);
+        //状态机启动
+        orderStateMachine.start(orders.getUserId(),String.valueOf(orders.getId()),orderSnapshotDTO);
     }
 }
