@@ -8,7 +8,9 @@ import javax.swing.plaf.metal.MetalBorders;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
+import com.jzo2o.api.foundations.ServeApi;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
+import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
 import com.jzo2o.api.trade.NativePayApi;
 import com.jzo2o.api.trade.TradingApi;
 import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
@@ -16,6 +18,7 @@ import com.jzo2o.api.trade.dto.response.NativePayResDTO;
 import com.jzo2o.api.trade.dto.response.TradingResDTO;
 import com.jzo2o.api.trade.enums.PayChannelEnum;
 import com.jzo2o.api.trade.enums.TradingStateEnum;
+import com.jzo2o.common.expcetions.BadRequestException;
 import com.jzo2o.common.expcetions.CommonException;
 import com.jzo2o.common.model.msg.TradeStatusMsg;
 import com.jzo2o.common.utils.BeanUtils;
@@ -38,6 +41,7 @@ import com.jzo2o.orders.manager.porperties.TradeProperties;
 import com.jzo2o.orders.manager.service.IOrdersCreateService;
 import com.jzo2o.orders.manager.service.impl.client.CustomerClient;
 import com.jzo2o.orders.manager.service.impl.client.FoundationClient;
+import com.jzo2o.orders.manager.service.impl.client.MarketClient;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
@@ -85,6 +89,29 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
 
     @Resource
     private OrderStateMachine orderStateMachine;
+    @Resource
+    private ServeApi serveApi;
+    @Resource
+    private MarketClient marketClient;
+
+    /**
+     * 获取可用优惠券
+     *
+     * @param serveId 服务id
+     * @param purNum  购买数量
+     * @return 可用优惠券列表
+     */
+    @Override
+    public List<AvailableCouponsResDTO> getAvailableCoupons(Long serveId, Integer purNum) {
+        ServeAggregationResDTO serveAggregationResDTO = serveApi.findById(serveId);
+        if (ObjectUtils.isNull(serveAggregationResDTO) || serveAggregationResDTO.getSaleStatus() != 2) {
+            throw new BadRequestException("服务不可用");
+        }
+        BigDecimal totalAmount = serveAggregationResDTO.getPrice().multiply(new BigDecimal(purNum));
+        List<AvailableCouponsResDTO> available = marketClient.getAvailable(totalAmount);
+        return available;
+    }
+
     /**
      * 下单接口
      *
