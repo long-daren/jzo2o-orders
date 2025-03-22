@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
 import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.jzo2o.api.market.CouponApi;
+import com.jzo2o.api.market.dto.request.CouponUseReqDTO;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
+import com.jzo2o.api.market.dto.response.CouponUseResDTO;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +26,11 @@ public class MarketClient {
     public List<AvailableCouponsResDTO> getAvailable(BigDecimal totalAmount){
         log.error("查询可用优惠券,订单金额:{}",totalAmount);
         return couponApi.getAvailable(totalAmount);
+    }
+    @SentinelResource(value = "use", fallback = "getAvailableFallback", blockHandler = "getAvailableBlockHandler")
+    public CouponUseResDTO use(CouponUseReqDTO couponUseReqDTO){
+        log.error("核销优惠券:{}",couponUseReqDTO.toString());
+        return couponApi.use(couponUseReqDTO);
     }
     //执行异常走
     public List<AvailableCouponsResDTO> getAvailableFallback(BigDecimal totalAmount, Throwable throwable) {

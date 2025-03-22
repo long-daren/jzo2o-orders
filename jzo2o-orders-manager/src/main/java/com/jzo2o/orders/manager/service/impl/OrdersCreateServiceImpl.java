@@ -10,7 +10,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jzo2o.api.customer.dto.response.AddressBookResDTO;
 import com.jzo2o.api.foundations.ServeApi;
 import com.jzo2o.api.foundations.dto.response.ServeAggregationResDTO;
+import com.jzo2o.api.market.dto.request.CouponUseReqDTO;
 import com.jzo2o.api.market.dto.response.AvailableCouponsResDTO;
+import com.jzo2o.api.market.dto.response.CouponUseResDTO;
 import com.jzo2o.api.trade.NativePayApi;
 import com.jzo2o.api.trade.TradingApi;
 import com.jzo2o.api.trade.dto.request.NativePayReqDTO;
@@ -161,10 +163,31 @@ public class OrdersCreateServiceImpl extends ServiceImpl<OrdersMapper, Orders> i
         orders.setLat(detail.getLat());
         long sort = DateUtils.toEpochMilli(orders.getServeStartTime()) + orders.getId() % 10000;
         orders.setSortBy(sort);
-        owner.add(orders);
+        if (ObjectUtils.isNull(placeOrderReqDTO.getCouponId())) {
+            owner.add(orders);
+        } else {
+            owner.addWithCoupon(orders, placeOrderReqDTO.getCouponId());
+        }
+
         PlaceOrderResDTO placeOrderResDTO = new PlaceOrderResDTO();
         placeOrderResDTO.setId(orders.getId());
         return placeOrderResDTO;
+    }
+    @Transactional(rollbackFor = Exception.class)
+    public void addWithCoupon(Orders orders, Long couponId) {
+        CouponUseReqDTO couponUseReqDTO = new CouponUseReqDTO();
+        couponUseReqDTO.setOrdersId(orders.getId());
+        couponUseReqDTO.setId(couponId);
+        couponUseReqDTO.setTotalAmount(orders.getTotalAmount());
+        //优惠券核销
+        CouponUseResDTO couponUseResDTO = marketClient.use(couponUseReqDTO);
+        // 设置优惠金额
+        orders.setDiscountAmount(couponUseResDTO.getDiscountAmount());
+        // 计算实付金额
+        BigDecimal realPayAmount = orders.getTotalAmount().subtract(orders.getDiscountAmount());
+        orders.setRealPayAmount(realPayAmount);
+        //保存订单
+        add(orders);
     }
 
     /**
